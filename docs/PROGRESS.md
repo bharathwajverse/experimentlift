@@ -1,6 +1,12 @@
 # Progress
 
-## Current phase: M0 baseline delivery in progress; Phase 3 gated
+## Current phase: M0 PASS; M1 PostgreSQL foundation in progress
+
+M0 merged at `3226b7eef9cf3b21007462fd24cc8c5130d43080` with
+post-merge CI run `44876504981` passing Python 3.11–3.14. M1 now has a
+feature-branch schema and migration candidate. Local regression has 65 passed
+and PostgreSQL checks skipped without a local service; **M1 is NOT TESTED
+against PostgreSQL** until CI executes. No M2 work has begun.
 
 Implemented: configuration validation, deterministic HMAC allocation with
 in-process first-assignment persistence, terminal outcomes, dedupe,

@@ -8,6 +8,11 @@ It does **not** send email, connect to marketing platforms, retain customer
 data, call an AI provider, expose an API, provide authentication, or make
 business claims from synthetic output.
 
+M1 PostgreSQL schema, migration and transaction helpers are under development
+on a feature branch. They have not passed real PostgreSQL CI yet. They do not
+provide an authenticated API. Run migration tests only with an explicitly
+disposable PostgreSQL 16 database; `alembic downgrade base` destroys M1 data.
+
 ## Install and run
 
 Requires Python 3.11+ (the local environment uses 3.11.9).

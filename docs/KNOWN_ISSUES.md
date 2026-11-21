@@ -27,6 +27,8 @@ Updated: 2026-11-21.
 | KI-021 | Process | Inspect public repository metadata and root files. | No project license is declared; public visibility does not grant reuse rights. | Open; repository owner must select a license |
 | KI-022 | Process | Query `main` branch protection through the authenticated GitHub API. | Endpoint returns 404, so required checks/reviews are not enforced by repository settings. | Open; configure protection/ruleset when repository plan and token permissions permit |
 | KI-023 | Low | Inspect annotations from Actions runs before and after upgrading action runtimes. | `checkout@v4` and `setup-python@v5` targeted deprecated Node.js 20; pinned v5/v6 upgrades removed the warnings. | Resolved; PR run `44876024706` and post-merge run `44876111286` passed all four jobs with zero annotations |
+| KI-024 | High | Initial draft of M1 migration imported mutable application `Base.metadata`. | A later ORM edit could rewrite historical bootstrap DDL; old databases and fresh installations could diverge. | Repaired with explicit frozen DDL; `alembic check` pending PostgreSQL CI |
+| KI-025 | Medium | Local Docker daemon is unavailable; the configured index has no SQLAlchemy distribution, and direct PyPI resolution cannot find `greenlet` for this environment. | Local PostgreSQL checks cannot run; CI must install dependencies and run against PostgreSQL 16. | Open pending PR CI evidence |
 
 ## In-session adversarial review conclusions (2026-11-21)
 

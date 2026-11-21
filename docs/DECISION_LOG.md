@@ -2,6 +2,9 @@
 
 | Date | Decision | Rationale |
 |---|---|---|
+| 2026-11-21 | M1 targets PostgreSQL 16, SQLAlchemy 2.x, Alembic and Psycopg 3; keep UUID row IDs separate from opaque domain keys. | Preserve Phase 2 identity and avoid a breaking statistical-model rewrite. |
+| 2026-11-21 | Assignment uniqueness is experiment-wide; event idempotency is workspace-wide and payload conflicts raise. | First assignment survives revision changes; concurrent retries cannot silently reassign or rewrite conversion. |
+| 2026-11-21 | Pin baseline direct libraries; bound M1 libraries by compatible major/minor and review transitive versions in CI. | KI-020 remains open until hashes or a reviewed cross-Python constraints policy is validated; no package manager added. |
 | 2026-11-20 | Use Python 3.11.9, `requires-python >=3.11`. | Installed environment supports selected libraries; a future container can pin 3.12+. |
 | 2026-11-20 | Build only pure Python first. | Validate measurement before APIs/UI/models. |
 | 2026-11-20 | Newcombe RD CI + score test; Fisher fallback. | Boundary-safe interval and explicit valid two-proportion test. |

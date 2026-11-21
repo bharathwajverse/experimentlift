@@ -14,6 +14,62 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  postgres:
+    name: PostgreSQL 16 integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: experimentlift_test
+          POSTGRES_PASSWORD: disposable_ci_only
+          POSTGRES_DB: experimentlift_test
+        ports:
+          - 127.0.0.1:5432:5432
+        options: >-
+          --health-cmd "pg_isready -U experimentlift_test -d experimentlift_test"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      DATABASE_URL: postgresql+psycopg://experimentlift_test:disposable_ci_only@127.0.0.1:5432/experimentlift_test
+      EXPERIMENTLIFT_TEST_DATABASE_URL: postgresql+psycopg://experimentlift_test:disposable_ci_only@127.0.0.1:5432/experimentlift_test
+    steps:
+      - name: Check out source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install test dependencies
+        run: python -m pip install -e ".[dev]"
+      - name: Wait for database
+        run: |
+          python - <<'PY'
+          import os
+          import time
+          import psycopg
+          for attempt in range(30):
+              try:
+                  with psycopg.connect(os.environ["DATABASE_URL"].replace("postgresql+psycopg://", "postgresql://"), connect_timeout=2) as conn:
+                      assert conn.execute("select 1").fetchone() == (1,)
+                  break
+              except psycopg.OperationalError:
+                  time.sleep(1)
+          else:
+              raise RuntimeError("PostgreSQL did not become ready")
+          PY
+      - name: Verify migration round trip and schema
+        run: |
+          python -m alembic upgrade head
+          python -m alembic check
+          python -m pytest -q tests/test_db_migration.py
+      - name: Verify PostgreSQL constraints and transactions
+        run: python -m pytest -q tests/test_db_postgres.py
+      - name: Regress statistical core
+        run: python -m pytest -q --ignore=tests/test_db_postgres.py --ignore=tests/test_db_migration.py
   test:
     name: Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
