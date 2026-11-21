@@ -38,8 +38,15 @@ def _seed(session):
     from experimentlift.db.models import Experiment, ExperimentRevision, Variant, Workspace
 
     wid, eid, rid, control, treatment = (uuid4() for _ in range(5))
+    # Models declare table-level ForeignKeyConstraints only, without ORM
+    # relationship() metadata, so SQLAlchemy derives no dependency edges and
+    # falls back to mapper-name ordering (Experiment sorts before Workspace).
+    # Flush each parent before its children, otherwise the child INSERT wins
+    # the race and PostgreSQL rejects it with fk_experiment_workspace.
     session.add(Workspace(id=wid, name="Synthetic workspace"))
+    session.flush()
     session.add(Experiment(id=eid, workspace_id=wid, experiment_key="sample"))
+    session.flush()
     session.add(
         ExperimentRevision(
             id=rid, workspace_id=wid, experiment_id=eid, number=1,
@@ -49,6 +56,7 @@ def _seed(session):
             ends_at=datetime.now(UTC) + timedelta(days=1),
         )
     )
+    session.flush()
     session.add_all([
         Variant(id=control, workspace_id=wid, revision_id=rid, arm="control", allocation=0.5),
         Variant(id=treatment, workspace_id=wid, revision_id=rid, arm="treatment", allocation=0.5),
@@ -202,6 +210,12 @@ def test_revision_cannot_be_inserted_active(db):
     wid, eid = uuid4(), uuid4()
     with Session(engine) as session:
         session.add(Workspace(id=wid, name="Synthetic workspace"))
+        # Flush the workspace first; without relationship() metadata the
+        # Experiment INSERT otherwise sorts ahead of Workspace and would fail
+        # on fk_experiment_workspace, making this test pass for the wrong
+        # reason (IntegrityError is a DBAPIError) instead of reaching the
+        # revision guard below.
+        session.flush()
         session.add(Experiment(id=eid, workspace_id=wid, experiment_key="sample"))
         session.commit()
         session.add(ExperimentRevision(

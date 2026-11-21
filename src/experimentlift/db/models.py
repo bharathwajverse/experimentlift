@@ -15,6 +15,16 @@ class Base(DeclarativeBase):
     pass
 
 
+# Flush-ordering contract: these models intentionally declare table-level
+# ForeignKeyConstraint metadata only and no ORM relationship()s, so a Session
+# derives no parent/child dependency edges and orders INSERTs by mapper name.
+# Because "Experiment" sorts before "Workspace", a session that holds a parent
+# and its children pending in the same flush emits the child first and
+# PostgreSQL rejects it. Production paths use Core inserts with explicit
+# ordering; code that uses session.add()/add_all() must flush each parent
+# before adding its children.
+
+
 def uid():
     return mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
 
