@@ -26,6 +26,7 @@ Updated: 2026-11-21.
 | KI-020 | Low | Inspect package resolution inputs. | Direct dependencies are pinned, but transitive dependencies and `setuptools>=68` resolve online without hashes, so installs are compatible and repeatable by direct versions but not bit-for-bit locked. | Open; add reviewed cross-version constraints or lock policy |
 | KI-021 | Process | Inspect public repository metadata and root files. | No project license is declared; public visibility does not grant reuse rights. | Open; repository owner must select a license |
 | KI-022 | Process | Query `main` branch protection through the authenticated GitHub API. | Endpoint returns 404, so required checks/reviews are not enforced by repository settings. | Open; configure protection/ruleset when repository plan and token permissions permit |
+| KI-023 | Low | Inspect annotations from Actions run `44875867614`. | `checkout@v4` and `setup-python@v5` target deprecated Node.js 20 and were forced onto Node.js 24. | Resolved on the M0 closeout branch by pinning `checkout@v5` and `setup-python@v6` commit SHAs; rerun required before merge |
 
 ## In-session adversarial review conclusions (2026-11-21)
 

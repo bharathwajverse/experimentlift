@@ -70,6 +70,9 @@ no Phase 3 code was written; see `DECISION_LOG.md` for the gate decision.
   compile, all 65 tests, and JSON/Markdown CLI smokes.
 - KI-009 and KI-011 are closed by remote history and clean cross-version CI
   evidence. Branch protection is not enabled (KI-022).
+- PR CI annotations exposed deprecated Node.js 20 action runtimes (KI-023);
+  action pins were upgraded to `checkout@v5` and `setup-python@v6`, pending the
+  required clean rerun before merge.
 
 ## Phase 3 unblock prerequisites
 
