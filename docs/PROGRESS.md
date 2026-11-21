@@ -71,8 +71,11 @@ no Phase 3 code was written; see `DECISION_LOG.md` for the gate decision.
 - KI-009 and KI-011 are closed by remote history and clean cross-version CI
   evidence. Branch protection is not enabled (KI-022).
 - PR CI annotations exposed deprecated Node.js 20 action runtimes (KI-023);
-  action pins were upgraded to `checkout@v5` and `setup-python@v6`, pending the
-  required clean rerun before merge.
+  action pins were upgraded to `checkout@v5` and `setup-python@v6`. PR run
+  `44876024706` and post-merge run `44876111286` passed all four Python jobs
+  with zero annotations.
+- PR #1 was squash-merged as `472e80a553122f859c533049aa2e57940b8631d2`;
+  local and remote `main` matched before this final evidence update.
 
 ## Phase 3 unblock prerequisites
 
