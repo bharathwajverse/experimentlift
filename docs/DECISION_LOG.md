@@ -22,3 +22,4 @@
 | 2026-11-21 | Bootstrap the verified source directly to the empty remote `main`, then use feature branches. | The remote has no refs, so a PR cannot precede the initial commit; direct bootstrap is the narrow exception. |
 | 2026-11-21 | Test clean installs on GitHub-hosted Linux for Python 3.11–3.14. | The package declares Python `>=3.11`; a fresh matrix exposes wheel and dependency compatibility rather than relying on the existing Windows venv. |
 | 2026-11-21 | Pin GitHub Actions by full commit SHA with read-only contents permission. | Reduces workflow supply-chain and token-permission risk while retaining version comments for maintainability. |
+| 2026-11-21 | M0 gate: **PASS** on bootstrap commit `cba2539656e97e91a725f950ab6c770ea7333685`. | Remote `main` matches the local SHA and Actions run `44875593856` passed artifact installs, 65 tests and CLI smokes on Python 3.11–3.14. KI-009 and KI-011 are closed. |

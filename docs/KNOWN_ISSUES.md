@@ -12,9 +12,9 @@ Updated: 2026-11-21.
 | KI-006 | Medium | Supply arm-asymmetric exposures. | Differential exposure was not diagnosed. | Resolved with optional diagnostic rates/test |
 | KI-007 | Medium | Supply naive timestamps or out-of-window assignment. | Validation was incomplete. | Resolved with model/analysis validators |
 | KI-008 | Medium | Review A/A operating-characteristic output. | Only positive wins and no Monte Carlo interval were reported. | Resolved with decision rate, Wilson intervals and coverage |
-| KI-009 | Process | `git log` has no commits; all files are untracked. | No reviewable repository history or clean baseline exists. | Open; no commit requested |
+| KI-009 | Process | Inspect local/remote history and compare `main` SHAs. | Initial absence of reviewable history is resolved. | Resolved; bootstrap commit `cba2539656e97e91a725f950ab6c770ea7333685` is present on remote `main` |
 | KI-010 | Blocker for Phase 3 | `docker version` cannot connect to Docker Desktop Linux engine; no `psql`/`pg_ctl`/`initdb`/`postgres` on PATH; `localhost:5432` refuses connections. | Disposable PostgreSQL integration/migration/E2E tests cannot currently run. | Open |
-| KI-011 | Low | Install `.[dev]` into a new temporary Python 3.11 venv. | Local clean install now succeeds: `pip check` passes and 65 tests pass; cross-version Linux artifact installation remains unverified until CI runs. | Open; close only after remote CI passes |
+| KI-011 | Low | Install the built wheel in isolated environments locally and in GitHub Actions. | Packaging/install compatibility is now demonstrated on local Python 3.11 and Linux Python 3.11–3.14. | Resolved; Actions run `44875593856` passed all four artifact-install jobs |
 | KI-012 | High | Supply NaN/infinite or mutate validated allocation. | SRM could fail open and frozen configuration could change. | Resolved with finite validation, immutable serializable allocation and regressions |
 | KI-013 | High | Analyze records created for another experiment revision. | Foreign data could be attributed to the current configuration. | Resolved with required experiment/revision provenance and mismatch rejection |
 | KI-014 | High | Supply pre-assignment or post-analysis outcomes/exposures/assignments. | Pre-treatment or unavailable future data could affect results. | Resolved with assignment-relative analysis cutoff enforcement |
@@ -25,6 +25,8 @@ Updated: 2026-11-21.
 | KI-019 | High | Analyze a configuration where one arm has zero assignments. | Report could claim `COMPLETE/VALID` with no estimate from that arm. | Resolved; critical `arm_without_assignments` issue forces `INVALID` |
 | KI-020 | Low | Inspect package resolution inputs. | Direct dependencies are pinned, but transitive dependencies and `setuptools>=68` resolve online without hashes, so installs are compatible and repeatable by direct versions but not bit-for-bit locked. | Open; add reviewed cross-version constraints or lock policy |
 | KI-021 | Process | Inspect public repository metadata and root files. | No project license is declared; public visibility does not grant reuse rights. | Open; repository owner must select a license |
+| KI-022 | Process | Query `main` branch protection through the authenticated GitHub API. | Endpoint returns 404, so required checks/reviews are not enforced by repository settings. | Open; configure protection/ruleset when repository plan and token permissions permit |
+| KI-023 | Low | Inspect annotations from Actions run `44875867614`. | `checkout@v4` and `setup-python@v5` target deprecated Node.js 20 and were forced onto Node.js 24. | Resolved on the M0 closeout branch by pinning `checkout@v5` and `setup-python@v6` commit SHAs; rerun required before merge |
 
 ## In-session adversarial review conclusions (2026-11-21)
 
