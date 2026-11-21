@@ -43,11 +43,11 @@ no Phase 3 code was written; see `DECISION_LOG.md` for the gate decision.
   Markdown CLI smoke runs exit 0 and label output `SYNTHETIC`.
 - Phase 3: **BLOCKED** — PostgreSQL absent (no daemon, no binaries, closed
   port 5432); Phase 3 implementation deliberately deferred.
-- Open, disclosed limitations: KI-009 (no commit history), KI-010 (PostgreSQL),
-  KI-011 (remote clean-install matrix), KI-020 (transitive lock policy), KI-021
-  (project license), external Phase 0–2 review unavailable.
+- Open, disclosed limitations: KI-010 (PostgreSQL), KI-020 (transitive lock
+  policy), KI-021 (project license), KI-022 (branch protection), and external
+  Phase 0–2 review unavailable.
 
-## M0 evidence in progress (2026-11-21)
+## M0 gate: PASS (2026-11-21)
 
 - Reproduced 65 passing tests in the existing environment.
 - A new temporary Python 3.11 environment installed `.[dev]`; `pip check` and
@@ -61,13 +61,20 @@ no Phase 3 code was written; see `DECISION_LOG.md` for the gate decision.
 - Added SHA-pinned, read-only GitHub Actions CI that installs the built wheel in
   a fresh environment across Python 3.11–3.14.
 - Independent M0 review found one high issue (editable install did not exercise
-  the wheel); it was repaired before commit. Remote push and CI remain pending,
-  so KI-009 and KI-011 remain open.
+  the wheel); it was repaired before commit. The follow-up review found no
+  critical/high blockers.
+- Bootstrap commit `cba2539656e97e91a725f950ab6c770ea7333685` was pushed to
+  remote `main`; local and remote SHAs matched.
+- GitHub Actions run `44875593856` passed on that exact SHA. Python 3.11, 3.12,
+  3.13 and 3.14 each built and installed the wheel, passed `pip check`, import,
+  compile, all 65 tests, and JSON/Markdown CLI smokes.
+- KI-009 and KI-011 are closed by remote history and clean cross-version CI
+  evidence. Branch protection is not enabled (KI-022).
 
 ## Phase 3 unblock prerequisites
 
 1. Reachable PostgreSQL 16+ instance (Docker Desktop Linux engine or a local
    server install) accepting connections on an approved disposable port.
-2. Approval to install SQLAlchemy/Alembic/FastAPI/uvicorn/test dependencies.
+2. Approval to add/install SQLAlchemy/Alembic/FastAPI/uvicorn/test dependencies.
 3. Then implement migrations, lifecycle rules, authentication and workspace
    authorization, with PostgreSQL-backed API and database E2E tests.
