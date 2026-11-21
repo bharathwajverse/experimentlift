@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Build wheel
+        run: python -m pip wheel --no-deps --wheel-dir dist .
+
+      - name: Create isolated artifact environment
+        run: python -m venv .artifact-venv
+
+      - name: Install wheel and test dependencies
+        run: >-
+          .artifact-venv/bin/python -m pip install
+          --disable-pip-version-check
+          dist/experimentlift-*.whl
+          hypothesis==6.170.17
+          pytest==8.4.2
+
+      - name: Verify dependency consistency
+        run: .artifact-venv/bin/python -m pip check
+
+      - name: Verify package import
+        run: .artifact-venv/bin/python -c "import experimentlift; print(experimentlift.__doc__)"
+
+      - name: Compile source and tests
+        run: .artifact-venv/bin/python -m compileall -q src tests
+
+      - name: Run complete test suite against wheel
+        run: .artifact-venv/bin/python -m pytest -q
+
+      - name: Verify JSON CLI output
+        run: |
+          .artifact-venv/bin/experimentlift run --scenario ab_known_effect --format json > report.json
+          .artifact-venv/bin/python -c "import json; r=json.load(open('report.json')); assert r['data_source']=='SYNTHETIC'; assert r['status']=='COMPLETE'; assert r['validity']=='VALID'"
+
+      - name: Verify Markdown CLI output
+        run: |
+          .artifact-venv/bin/experimentlift run --scenario ab_known_effect --format markdown > report.md
+          grep -F "SYNTHETIC DATA ONLY" report.md

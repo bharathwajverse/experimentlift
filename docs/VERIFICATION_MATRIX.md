@@ -1,0 +1,31 @@
+# Verification matrix
+
+Updated: 2026-11-21 after focused repair, in-session adversarial review, full-suite regression execution and the Phase 0–2 gate decision.
+
+Gate result: **Phase 0–2 PASS** (14 PASS, 0 FAIL, 0 NOT TESTED); **Phase 3 BLOCKED** on PostgreSQL availability. Evidence commands: `pytest -q` (65 passed), `compileall -q src tests`, `pip check`, installed JSON/Markdown CLI runs and a whitespace scan of all source/documentation candidates.
+
+| ID | Requested behavior | Implementation | Verification/evidence | Actual result | Status | Limitation |
+|---|---|---|---|---|---|---|
+| P02-ENV-01 | Editable install/import/CLI on Windows | `pyproject.toml`, `cli.py` | project venv import, `pip check`, installed JSON/Markdown CLI smoke, invalid-command test | Runtime and entry point pass | PASS | Separate editable-wheel probe passed, but its dependency runtime was not isolated because no local dependency wheels exist |
+| P02-STAT-01 | Assigned-population ITT | `analysis.py` | missingness and exposure regression tests | Summary and effect use assigned denominators; completeness remains observed/assigned | PASS | Binary fixed-horizon only |
+| P02-STAT-02 | Newcombe CI + independent reference | `analysis.py` | `test_statistical_references.py` manual Wilson-component calculation | Numerical match | PASS | statsmodels remains implementation dependency |
+| P02-STAT-03 | Wald diagnostic CI | `models.py`, `analysis.py` | independent manual SE/normal-quantile test + CLI artifact | Numerical match; report v0.2 field present | PASS | Diagnostic only |
+| P02-STAT-04 | Valid score test/Fisher fallback | `analysis.py` | manual pooled score reference, SciPy Fisher reference, unequal-arm regression | Numerical match and correct fallback routing | PASS | Fisher tests odds null while effect CI is RD |
+| P02-STAT-05 | Verdict/status gates | `analysis.py` | known effect, A/A, SRM, missing, running, empty/boundary tests | Expected gates demonstrated | PASS | No sequential stopping |
+| P02-STAT-06 | SRM approved policy | `models.py`, `analysis.py` | SRM fixture above minimum + serialized defaults | p < 0.001 at total n >= 1,000 | PASS | Threshold is product policy, not universal |
+| P02-STAT-07 | Differential exposure diagnostics | `analysis.py` | 50% vs 90% exposure regression | Warning and rates emitted; ITT unchanged | PASS | No durable exposure ingestion in Phase 2 |
+| P02-STAT-08 | Simulations with uncertainty and production parity | `simulation.py`, shared `calculate_proportion_statistics` | 2,000 A/A, 500 known-effect and sparse Fisher regression | Decision rate, Wilson MC intervals, bias, coverage and Fisher routing checked | PASS | Seeded finite Monte Carlo tolerance |
+| P02-ASGN-01 | Stable, revision-bound assignment with immutable valid allocation | `models.py`, `assignment.py` | mapping-order, empty/non-finite allocation, immutability, revision and identifier tests | Canonical revision-scoped HMAC allocation and opaque assignment ID pass | PASS | Persistence remains process-local |
+| P02-EVT-01 | Revision-bound idempotent unique converters | models/analysis | replay, changed-payload, contradictory-outcome and foreign-revision tests | Identical replay deduped; conflicts/mismatches rejected | PASS | Input list only; no durable ledger |
+| P02-TIME-01 | Window/timezone/causal-order enforcement | models/analysis | naive timestamp, pre-assignment, future observation and future assignment tests | Invalid timestamps rejected; observations restricted to assignment time through analysis cutoff | PASS | UTC normalization is caller responsibility |
+| P02-SCN-01 | Eight mandatory scenarios plus audit boundaries | `tests/` | known effect, A/A, SRM, missing, duplicate, zero, Fisher, running and regression suite | All pass in 65-test suite | PASS | Synthetic fixtures only |
+| P02-DOC-01 | Honest docs/synthetic labels | `docs`, reports | source/doc inspection + JSON/Markdown CLI artifacts | Scope, separate issues/warnings and synthetic limits explicit | PASS | In-session adversarial review complete; independent external review unavailable (provider usage limit) |
+| P03-DB-01 | PostgreSQL/migrations | none | Docker probe + local binary/port probe (`psql`, `pg_ctl`, `initdb`, `postgres` absent; `localhost:5432` closed) | No PostgreSQL runtime available | BLOCKED | Cannot claim PostgreSQL verification |
+| P03-API-01 | FastAPI/lifecycle/authz | none | inspection | Not implemented | BLOCKED | Phase 3 requires PostgreSQL evidence |
+| M0-BSL-01 | Reproduce audited local baseline | existing source and tests | `python -m pytest -q` | 65 tests pass locally | PASS | Local Python 3.11.9 environment |
+| M0-ID-01 | Verify Git author belongs to repository owner | local Git config | authenticated GitHub identity check plus public attributed commits | Authenticated account is `bharathwajverse`; configured email has attributed GitHub commits | PASS | `/user/emails` unavailable to current credential scope |
+| M0-REM-01 | Verify intended empty remote and default branch | GitHub repository metadata | GitHub API, configured `origin` and `git ls-remote` | Public repository exists, default is `main`, `origin` is correct, no remote refs exist | PASS | Remote write permission is proven only by push |
+| M0-SEC-01 | Exclude generated/sensitive artifacts | `.gitignore` | ignored-file inventory and secret-pattern scan | Caches, venv and egg metadata ignored; no candidate secret matched | PASS | Pattern scan is not proof that no secret exists |
+| M0-CI-01 | Isolated wheel installation and verification in GitHub Actions | `.github/workflows/ci.yml` | remote workflow run | Workflow generated and reviewed; not executed | NOT TESTED | Requires pushed commit |
+| M0-GIT-01 | Reviewable baseline on remote `main` | planned initial commit | compare local, remote and workflow SHAs | Not pushed | NOT TESTED | Requires commit and authenticated push |
+| M1-PLAN-01 | PostgreSQL 16 CI-service strategy | `docs/MASTER_ROADMAP.md` | design review | Contract and test boundary documented | PASS | Implementation remains blocked until M0 closes |
