@@ -37,5 +37,19 @@ data-source fields; they do not recompute statistics.
 Migration `0001_initial` contains frozen, manually reviewed DDL for all 12
 tables and database triggers. `alembic check` compares it to current ORM
 metadata on PostgreSQL in CI.
+
+Known limitations of the immutability guards (documented, accepted for M1):
+
+- The guard triggers are plain row-level `BEFORE UPDATE OR DELETE` triggers.
+  A connection that owns the tables can `DROP TRIGGER`/`DISABLE TRIGGER`, and
+  `TRUNCATE` bypasses row triggers entirely. The guards protect against
+  application bugs and ordinary writers, not against an owner-privileged
+  connection. The test fixture relies on this: it resets state with
+  `TRUNCATE TABLE workspaces CASCADE`.
+- `downgrade()` drops all 12 tables and therefore all history. The constraint
+  is documented, not enforced: never run `alembic downgrade` against a shared
+  or production database. `env.py` requires an explicit
+  `postgresql+psycopg://` URL, so an accidental SQLite run is impossible.
+
 Downgrade deletes all M1 rows and is permitted **only in a disposable test
 database**. No production database has been touched.
