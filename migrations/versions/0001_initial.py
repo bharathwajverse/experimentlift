@@ -179,20 +179,36 @@ def upgrade():
         CREATE FUNCTION experimentlift_revision_guard() RETURNS trigger
         LANGUAGE plpgsql AS $$
         BEGIN
-            IF OLD.state <> 'draft' THEN
-                RAISE EXCEPTION 'activated revision is immutable';
+            IF TG_OP = 'INSERT' THEN
+                IF NEW.state <> 'draft' THEN
+                    RAISE EXCEPTION 'revisions must be inserted as draft';
+                END IF;
+                RETURN NEW;
             END IF;
             IF TG_OP = 'DELETE' THEN
+                IF OLD.state <> 'draft' THEN
+                    RAISE EXCEPTION 'activated revision is immutable';
+                END IF;
                 RETURN OLD;
             END IF;
             IF NEW.workspace_id <> OLD.workspace_id OR NEW.experiment_id <> OLD.experiment_id
                OR NEW.number <> OLD.number OR NEW.id <> OLD.id THEN
                 RAISE EXCEPTION 'revision identity is immutable';
             END IF;
-            IF NEW.state NOT IN ('draft', 'active') THEN
+            IF OLD.state <> 'draft' AND (
+                OLD.state <> 'active' OR NEW.state <> 'closed'
+                OR NEW.configuration IS DISTINCT FROM OLD.configuration
+                OR NEW.configuration_hash IS DISTINCT FROM OLD.configuration_hash
+                OR NEW.starts_at IS DISTINCT FROM OLD.starts_at
+                OR NEW.ends_at IS DISTINCT FROM OLD.ends_at
+                OR NEW.created_at IS DISTINCT FROM OLD.created_at
+            ) THEN
+                RAISE EXCEPTION 'activated revision is immutable';
+            END IF;
+            IF OLD.state = 'draft' AND NEW.state NOT IN ('draft', 'active') THEN
                 RAISE EXCEPTION 'draft can only activate';
             END IF;
-            IF NEW.state = 'active' AND (
+            IF OLD.state = 'draft' AND NEW.state = 'active' AND (
                 SELECT count(*) <> 2 OR coalesce(sum(allocation), 0) <> 1
                 FROM variants WHERE workspace_id = OLD.workspace_id AND revision_id = OLD.id
             ) THEN
@@ -204,7 +220,7 @@ def upgrade():
     """)
     op.execute("""
         CREATE TRIGGER revision_frozen_after_activation
-        BEFORE UPDATE OR DELETE ON experiment_revisions
+        BEFORE INSERT OR UPDATE OR DELETE ON experiment_revisions
         FOR EACH ROW EXECUTE FUNCTION experimentlift_revision_guard();
     """)
     op.execute("""
@@ -218,6 +234,13 @@ def upgrade():
             ELSE
                 target_workspace := NEW.workspace_id;
                 target_revision := NEW.revision_id;
+            END IF;
+            IF TG_OP = 'UPDATE' AND (
+                NEW.id <> OLD.id OR NEW.workspace_id <> OLD.workspace_id
+                OR NEW.revision_id <> OLD.revision_id
+                OR NEW.arm <> OLD.arm
+            ) THEN
+                RAISE EXCEPTION 'variant identity is immutable';
             END IF;
             IF EXISTS (
                 SELECT 1 FROM experiment_revisions
@@ -236,6 +259,76 @@ def upgrade():
         BEFORE INSERT OR UPDATE OR DELETE ON variants
         FOR EACH ROW EXECUTE FUNCTION experimentlift_variant_guard();
     """)
+    op.execute("""
+        CREATE FUNCTION experimentlift_experiment_guard() RETURNS trigger
+        LANGUAGE plpgsql AS $$
+        BEGIN
+            IF TG_OP = 'UPDATE' AND (
+                NEW.id <> OLD.id OR NEW.workspace_id <> OLD.workspace_id
+                OR NEW.experiment_key <> OLD.experiment_key
+            ) THEN
+                RAISE EXCEPTION 'experiment identity is immutable';
+            END IF;
+            IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
+            RETURN NEW;
+        END;
+        $$;
+    """)
+    op.execute("""
+        CREATE TRIGGER experiment_identity_frozen
+        BEFORE UPDATE OR DELETE ON experiments
+        FOR EACH ROW EXECUTE FUNCTION experimentlift_experiment_guard();
+    """)
+    op.execute("""
+        CREATE FUNCTION experimentlift_metric_guard() RETURNS trigger
+        LANGUAGE plpgsql AS $$
+        DECLARE target_workspace uuid; target_revision uuid;
+        BEGIN
+            IF TG_OP = 'UPDATE' AND (
+                NEW.id <> OLD.id OR NEW.workspace_id <> OLD.workspace_id
+                OR NEW.revision_id <> OLD.revision_id
+            ) THEN
+                RAISE EXCEPTION 'metric identity is immutable';
+            END IF;
+            IF TG_OP = 'DELETE' THEN
+                target_workspace := OLD.workspace_id;
+                target_revision := OLD.revision_id;
+            ELSE
+                target_workspace := NEW.workspace_id;
+                target_revision := NEW.revision_id;
+            END IF;
+            IF EXISTS (
+                SELECT 1 FROM experiment_revisions
+                WHERE workspace_id = target_workspace AND id = target_revision
+                  AND state <> 'draft'
+            ) THEN
+                RAISE EXCEPTION 'activated revision metrics are immutable';
+            END IF;
+            IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
+            RETURN NEW;
+        END;
+        $$;
+    """)
+    op.execute("""
+        CREATE TRIGGER metric_frozen_after_activation
+        BEFORE INSERT OR UPDATE OR DELETE ON metrics
+        FOR EACH ROW EXECUTE FUNCTION experimentlift_metric_guard();
+    """)
+    op.execute("""
+        CREATE TRIGGER assignments_append_only
+        BEFORE UPDATE OR DELETE ON assignments
+        FOR EACH ROW EXECUTE FUNCTION experimentlift_immutable_row();
+    """)
+    op.execute("""
+        CREATE TRIGGER exposures_append_only
+        BEFORE UPDATE OR DELETE ON exposures
+        FOR EACH ROW EXECUTE FUNCTION experimentlift_immutable_row();
+    """)
+    op.execute("""
+        CREATE TRIGGER events_append_only
+        BEFORE UPDATE OR DELETE ON events
+        FOR EACH ROW EXECUTE FUNCTION experimentlift_immutable_row();
+    """)
 
 
 def downgrade():
@@ -247,5 +340,7 @@ def downgrade():
     ):
         op.drop_table(table)
     op.execute("DROP FUNCTION experimentlift_variant_guard()")
+    op.execute("DROP FUNCTION experimentlift_experiment_guard()")
+    op.execute("DROP FUNCTION experimentlift_metric_guard()")
     op.execute("DROP FUNCTION experimentlift_revision_guard()")
     op.execute("DROP FUNCTION experimentlift_immutable_row()")

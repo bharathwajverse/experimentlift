@@ -194,6 +194,27 @@ def test_revision_activation_and_history_are_immutable(db):
             session.commit()
 
 
+def test_revision_cannot_be_inserted_active(db):
+    from sqlalchemy.exc import DBAPIError
+    from experimentlift.db.models import Experiment, ExperimentRevision, Workspace
+
+    engine, Session = db
+    wid, eid = uuid4(), uuid4()
+    with Session(engine) as session:
+        session.add(Workspace(id=wid, name="Synthetic workspace"))
+        session.add(Experiment(id=eid, workspace_id=wid, experiment_key="sample"))
+        session.commit()
+        session.add(ExperimentRevision(
+            workspace_id=wid, experiment_id=eid, number=1,
+            configuration={}, configuration_hash="c" * 64,
+            starts_at=datetime.now(UTC) - timedelta(days=1),
+            ends_at=datetime.now(UTC) + timedelta(days=1),
+            state="active",
+        ))
+        with pytest.raises(DBAPIError):
+            session.commit()
+
+
 def test_schema_constraints_and_event_revision_provenance(db):
     from sqlalchemy import select
     from sqlalchemy.exc import IntegrityError
@@ -227,3 +248,96 @@ def test_schema_constraints_and_event_revision_provenance(db):
             session.commit()
         session.rollback()
         assert not session.scalars(select(Event)).all()
+
+
+def test_historical_rows_are_append_only(db):
+    from sqlalchemy import select
+    from sqlalchemy.exc import DBAPIError
+    from experimentlift.db.models import Assignment, Event, Exposure
+    from experimentlift.db.store import assign, record_event
+
+    engine, Session = db
+    now = datetime.now(UTC)
+    with Session(engine) as session:
+        wid, eid, rid, control, _ = _seed(session)
+        assignment = assign(session, wid, eid, rid, "synthetic-participant", control)
+        session.flush()
+        assignment_id = assignment.id
+        event = record_event(
+            session, wid, eid, rid, assignment_id, "synthetic-key",
+            "converted", "synthetic", now,
+        )
+        session.add(Exposure(
+            workspace_id=wid, experiment_id=eid, revision_id=rid,
+            assignment_id=assignment_id, exposure_id="synthetic-exposure",
+            occurred_at=now,
+        ))
+        session.commit()
+        event_id = event.id
+
+        assignment = session.get(Assignment, assignment_id)
+        assignment.participant_id = "rewritten"
+        with pytest.raises(DBAPIError):
+            session.commit()
+        session.rollback()
+
+        event = session.get(Event, event_id)
+        event.status = "not_converted"
+        with pytest.raises(DBAPIError):
+            session.commit()
+        session.rollback()
+
+        exposure = session.scalar(select(Exposure))
+        exposure.occurred_at = now + timedelta(seconds=1)
+        with pytest.raises(DBAPIError):
+            session.commit()
+
+
+def test_experiment_identity_and_metric_contract_are_frozen(db):
+    from sqlalchemy import select
+    from sqlalchemy.exc import DBAPIError
+    from experimentlift.db.models import Experiment, ExperimentRevision, Metric
+
+    engine, Session = db
+    with Session(engine) as session:
+        wid, eid, rid, control, _ = _seed(session)
+        session.add(Metric(
+            workspace_id=wid, revision_id=rid, name="conversion",
+            definition={"kind": "binary"},
+        ))
+        session.commit()
+        metric = session.scalar(select(Metric))
+        metric.definition = {"kind": "binary", "window": "7d"}
+        session.commit()
+        detached = ExperimentRevision(
+            workspace_id=wid, experiment_id=eid, number=2,
+            configuration={}, configuration_hash="d" * 64,
+            starts_at=datetime.now(UTC) - timedelta(days=1),
+            ends_at=datetime.now(UTC) + timedelta(days=1),
+        )
+        session.add(detached)
+        session.commit()
+        metric = session.scalar(select(Metric))
+        metric.revision_id = detached.id
+        with pytest.raises(DBAPIError):
+            session.commit()
+        session.rollback()
+        experiment = session.get(Experiment, eid)
+        experiment.experiment_key = "renamed"
+        with pytest.raises(DBAPIError):
+            session.commit()
+        session.rollback()
+        revision = session.get(ExperimentRevision, rid)
+        revision.state = "active"
+        session.commit()
+        metric = session.scalar(select(Metric))
+        metric.definition = {"kind": "binary", "window": "14d"}
+        with pytest.raises(DBAPIError):
+            session.commit()
+        session.rollback()
+        session.add(Metric(
+            workspace_id=wid, revision_id=rid, name="late",
+            definition={"kind": "binary"},
+        ))
+        with pytest.raises(DBAPIError):
+            session.commit()
