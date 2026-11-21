@@ -1,33 +1,53 @@
 # Progress
 
-## Current phase: M0 PASS; M1 PostgreSQL foundation in progress
+## Current phase: M0 PASS; M1 PostgreSQL foundation PENDING REVIEW/MERGE
 
 M0 merged at `3226b7eef9cf3b21007462fd24cc8c5130d43080` with
-post-merge CI run `44876504981` passing Python 3.11–3.14. M1 now has a
-feature-branch schema and migration candidate. Local regression has 65 passed
-and PostgreSQL checks skipped without a local service; **M1 is NOT TESTED
-against PostgreSQL** until CI executes. No M2 work has begun.
+post-merge CI run `44876504981` passing Python 3.11–3.14.
+
+**M1 PostgreSQL evidence is now demonstrated in CI.** Branch
+`feat/m1-postgresql-foundation` (PR #3) reaches SHA
+`c80b8c7aabeede00a26278341d9c29cd3f76d29d`; Actions run `44909032886`
+completed `success` with 5/5 jobs green — `PostgreSQL 16 integration`,
+`Python 3.11`, `Python 3.12`, `Python 3.13`, `Python 3.14`. The PostgreSQL
+job reported `1 passed` (migration), `10 passed` (integration) and `65 passed`
+(statistical baseline), with no skips, confirming
+`EXPERIMENTLIFT_TEST_DATABASE_URL` was set and tests hit a real
+`postgres:16` service. Server logs show each immutability guard rejecting the
+invalid write it exists to reject.
+
+**M1 is not yet merged**, so it is not marked PASS until the merge and
+post-merge CI are verified. No M2 work has begun.
+
+Repair history for M1 in this branch:
+
+- `3fe427d` added the schema, Alembic config, migration and CI job.
+- `95b310e` added revision/variant/history immutability guards and closed a
+  hole where a metric could move between revisions; CI run `44887532959`
+  then failed the PostgreSQL job (`10 failed`, `fk_experiment_workspace`).
+- Root cause: the models intentionally declare table-level
+  `ForeignKeyConstraint`s with no ORM `relationship()`s, so a `Session`
+  derives no parent/child dependency edges and falls back to mapper-name
+  ordering — `"Experiment"` sorts before `"Workspace"`, so a single flush
+  emitting a child before its parent is rejected by PostgreSQL.
+  Reproduced DB-free with a mock-engine probe (first INSERT was `experiments`).
+- `c80b8c7` ordered parent flushes before child inserts in the affected tests
+  and documented the flush-order contract in `models.py`; the probe then
+  observed `workspaces`, `experiments`, `experiment_revisions`, `variants`.
+  Production `store.py` paths use Core inserts and were unaffected.
 
 Implemented: configuration validation, deterministic HMAC allocation with
 in-process first-assignment persistence, terminal outcomes, dedupe,
 fixed-horizon analysis, validity gates, reports, seeded simulation checks and
-CLI.
+CLI, plus the M1 persistence foundation (12 workspace-scoped tables, frozen
+initial migration, immutability triggers, assignment/event idempotency with
+typed conflicts).
 
-The audit added canonical allocation, opaque assignment IDs, ITT-consistent
-summaries, conflict rejection, timestamp/window validation, corrected
-unequal-arm expected cells, independent statistical references, a Wald
-diagnostic, exposure diagnostics and simulation uncertainty/coverage outputs.
-The first adversarial pass then found and drove repairs for non-finite/mutable
-allocation, experiment-revision provenance, observation causal ordering,
-simulation/production method drift and incomplete warning rendering. The
-follow-up in-session review of all eight source modules added repairs for the
-fabricated Newcombe fallback, exposure records inflating ignored events, and
-zero-assignment arms reporting `COMPLETE/VALID`.
-
-Not implemented: database, FastAPI, authz, durable audit events, durable exposure
-ingestion, creative storage, AI generation, frontend, Docker configuration, deployment,
-production observability, deletion workflow, provider integrations or
-real-world validation.
+Not implemented: FastAPI, authz, durable audit-event ingestion, durable exposure
+ingestion, creative storage, AI generation, frontend, Docker configuration,
+deployment, production observability, deletion workflow, provider
+integrations or real-world validation. The `ai_generations` table is deferred
+until a documented AI-milestone requirement exists.
 
 The 2026-11-21 audit first ran the pre-audit suite, then repaired the
 documented gaps test-first. Current local evidence is 65 passing tests,
@@ -47,11 +67,34 @@ no Phase 3 code was written; see `DECISION_LOG.md` for the gate decision.
 - Phase 0–2: **PASS** — 14/14 P02 requirements PASS, 0 FAIL, 0 NOT TESTED;
   65 collected tests pass, `compileall` and `pip check` succeed, JSON and
   Markdown CLI smoke runs exit 0 and label output `SYNTHETIC`.
-- Phase 3: **BLOCKED** — PostgreSQL absent (no daemon, no binaries, closed
-  port 5432); Phase 3 implementation deliberately deferred.
-- Open, disclosed limitations: KI-010 (PostgreSQL), KI-020 (transitive lock
-  policy), KI-021 (project license), KI-022 (branch protection), and external
-  Phase 0–2 review unavailable.
+- Phase 3: **BLOCKED** — local PostgreSQL absent (no daemon, no binaries,
+  closed port 5432); Phase 3 implementation deliberately deferred. This block
+  is about *local* availability only: CI supplies a disposable `postgres:16`
+  service, which is how M1 was verified.
+- M1: **evidence PASS in CI, merge pending** — see the M1 gate section below.
+- Open, disclosed limitations: KI-010 (local PostgreSQL), KI-020 (transitive
+  lock policy), KI-021 (project license), KI-022 (branch protection), and
+  external Phase 0–2 review unavailable.
+
+## M1 gate: evidence PASS, PR #3 pending merge (2026-11-21)
+
+- Branch `feat/m1-postgresql-foundation`, SHA
+  `c80b8c7aabeede00a26278341d9c29cd3f76d29d`, PR #3 (draft).
+- Actions run `44909032886` concluded `success`; 5/5 jobs green:
+  `PostgreSQL 16 integration` (`136860687454`), `Python 3.11`, `3.12`, `3.13`,
+  `3.14`.
+- PostgreSQL job evidence: `1 passed in 2.85s` (migration upgrade/downgrade/
+  re-upgrade/drift), `10 passed in 1.37s` (integration), `65 passed in 5.67s`
+  (statistical baseline). No skips, so the real-database path executed.
+- Server-side log confirms each guard rejected the invalid write it exists to
+  reject: `activated revision is immutable`, `activated revision variants are
+  immutable`, `revisions must be inserted as draft`, `metric identity is
+  immutable`, `experiment identity is immutable`, `immutable historical row`,
+  plus the FK and unique-constraint rejections.
+- Failed predecessor run `44887532959` at `95b310e` (`10 failed`,
+  `fk_experiment_workspace`) is repaired by `c80b8c7` and recorded as KI-026.
+- Not yet claimed: M1 PASS. Merge of PR #3 and post-merge CI on `main` must be
+  verified first, and local PostgreSQL remains unavailable (KI-010).
 
 ## M0 gate: PASS (2026-11-21)
 
@@ -85,8 +128,15 @@ no Phase 3 code was written; see `DECISION_LOG.md` for the gate decision.
 
 ## Phase 3 unblock prerequisites
 
-1. Reachable PostgreSQL 16+ instance (Docker Desktop Linux engine or a local
-   server install) accepting connections on an approved disposable port.
-2. Approval to add/install SQLAlchemy/Alembic/FastAPI/uvicorn/test dependencies.
+1. Reachable PostgreSQL 16+ instance accepting connections on an approved
+   disposable port. **Satisfied for M1 verification via the CI
+   `postgres:16` service**; still unsatisfied *locally* (no Docker engine, no
+   `psql`/`pg_ctl`/`initdb`/`postgres`, closed port 5432), so any Phase 3 E2E
+   work must either run in CI or wait for a local server (KI-010).
+2. Approval to add/install SQLAlchemy/Alembic/FastAPI/uvicorn/test
+   dependencies. **Partially satisfied**: SQLAlchemy 2.0.58, Alembic 1.18.5,
+   Mako 1.4.3, psycopg 3.3.9 and psycopg-binary 3.3.9 are installed and
+   pinned for M1; FastAPI/uvicorn are not yet added. Transitive locking policy
+   remains open (KI-020).
 3. Then implement migrations, lifecycle rules, authentication and workspace
    authorization, with PostgreSQL-backed API and database E2E tests.
