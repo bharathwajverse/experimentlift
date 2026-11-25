@@ -1,6 +1,6 @@
 # Progress
 
-## Current phase: M0 PASS; M1 PostgreSQL foundation PENDING REVIEW/MERGE
+## Current phase: M0 PASS; M1 PostgreSQL foundation PASS; M2 not started
 
 M0 merged at `3226b7eef9cf3b21007462fd24cc8c5130d43080` with
 post-merge CI run `44876504981` passing Python 3.11–3.14.
@@ -16,10 +16,11 @@ job reported `1 passed` (migration), `12 passed` (integration) and `65 passed`
 `postgres:16` service. Server logs show each immutability guard rejecting the
 invalid write it exists to reject.
 
-**M1 is not yet merged**, so it is not marked PASS until the merge and
-post-merge CI are verified. No M2 work has begun.
+**M1 merged** as PR #3 at `c9fd52bb08b949501dd592d81d717691e1963028`.
+Post-merge Actions run `45653341203` passed all five jobs on that exact
+`main` SHA. M1 is PASS; no M2 work has begun.
 
-Repair history for M1 in this branch:
+Repair history for the M1 feature branch (now merged):
 
 - `3fe427d` added the schema, Alembic config, migration and CI job.
 - `95b310e` added revision/variant/history immutability guards and closed a
@@ -77,15 +78,16 @@ no Phase 3 code was written; see `DECISION_LOG.md` for the gate decision.
   closed port 5432); Phase 3 implementation deliberately deferred. This block
   is about *local* availability only: CI supplies a disposable `postgres:16`
   service, which is how M1 was verified.
-- M1: **evidence PASS in CI, merge pending** — see the M1 gate section below.
+- M1: **PASS** — PR #3 merged and post-merge CI on `main` passed; see the
+  M1 gate section below.
 - Open, disclosed limitations: KI-010 (local PostgreSQL), KI-020 (transitive
   lock policy), KI-021 (project license), KI-022 (branch protection), and
   external Phase 0–2 review unavailable.
 
-## M1 gate: evidence PASS, PR #3 pending merge (2026-11-25)
+## M1 gate: PASS on merged `main` (2026-11-25)
 
-- Branch `feat/m1-postgresql-foundation`, SHA
-  `110c323fad1a9e582d582b485c41911236e41f35`, PR #3 (ready for review).
+- Feature branch `feat/m1-postgresql-foundation`, fix SHA
+  `110c323fad1a9e582d582b485c41911236e41f35`, merged via PR #3.
 - Actions run `45652442606` concluded `success`; 5/5 jobs green:
   `PostgreSQL 16 integration` (`139340220768`), `Python 3.11`, `3.12`, `3.13`,
   `3.14`.
@@ -105,8 +107,10 @@ no Phase 3 code was written; see `DECISION_LOG.md` for the gate decision.
   (provider usage limit); a distinct in-session adversarial diff review
   found the concurrency bug and produced RED/GREEN CI evidence. This is
   **not** represented as a successful second independent agent review.
-- Not yet claimed: M1 PASS. Merge of PR #3 and post-merge CI on `main` must be
-  verified first, and local PostgreSQL remains unavailable (KI-010).
+- PR #3 merged at `c9fd52bb08b949501dd592d81d717691e1963028`; the
+  remote `main` SHA matched, and post-merge run `45653341203` passed the
+  PostgreSQL integration job and Python 3.11–3.14 matrix (5/5). Local
+  PostgreSQL remains unavailable (KI-010).
 
 ## M0 gate: PASS (2026-11-21)
 
