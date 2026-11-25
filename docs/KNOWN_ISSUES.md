@@ -1,6 +1,6 @@
 # Known issues
 
-Updated: 2026-11-21.
+Updated: 2026-11-25.
 
 | ID | Severity | Reproduction / evidence | Consequence | State |
 |---|---|---|---|---|
@@ -27,6 +27,10 @@ Updated: 2026-11-21.
 | KI-021 | Process | Inspect public repository metadata and root files. | No project license is declared; public visibility does not grant reuse rights. | Open; repository owner must select a license |
 | KI-022 | Process | Query `main` branch protection through the authenticated GitHub API. | Endpoint returns 404, so required checks/reviews are not enforced by repository settings. | Open; configure protection/ruleset when repository plan and token permissions permit |
 | KI-023 | Low | Inspect annotations from Actions runs before and after upgrading action runtimes. | `checkout@v4` and `setup-python@v5` targeted deprecated Node.js 20; pinned v5/v6 upgrades removed the warnings. | Resolved; PR run `44876024706` and post-merge run `44876111286` passed all four jobs with zero annotations |
+| KI-024 | High | Initial draft of M1 migration imported mutable application `Base.metadata`. | A later ORM edit could rewrite historical bootstrap DDL; old databases and fresh installations could diverge. | Resolved with explicit frozen DDL; migration test `test_upgrade_downgrade_reupgrade_and_drift` passed against real PostgreSQL 16 in CI run `44909032886` |
+| KI-025 | Medium | Local Docker daemon is unavailable; the configured index has no SQLAlchemy distribution, and direct PyPI resolution cannot find `greenlet` for this environment. | Local PostgreSQL checks cannot run; CI must install dependencies and run against PostgreSQL 16. | Resolved by CI evidence: run `44909032886` `PostgreSQL 16 integration` passed 1 migration + 10 integration + 65 regression tests with no skips. Local service still absent (KI-010) |
+| KI-026 | High | In one flush, `tests/test_db_postgres.py` pending `Workspace` + `Experiment` produced `INSERT INTO experiments` before `workspaces`, rejected by `fk_experiment_workspace` (CI run `44887532959`, `10 failed`). | Models declare table-level FKs with no `relationship()`s, so SQLAlchemy has no dependency edges and tie-breaks on mapper name; `"Experiment"` sorts before `"Workspace"`. Also made `test_revision_cannot_be_inserted_active` pass for the wrong reason (`IntegrityError` is a `DBAPIError`) without ever reaching the revision guard. | Resolved by flushing each parent before its children in the two affected tests and documenting the contract in `src/experimentlift/db/models.py`; DB-free probe confirmed `workspaces → experiments → experiment_revisions → variants`, and CI run `44909032886` passed all 10 integration tests |
+| KI-027 | High | With one transaction holding an uncommitted variant allocation change, a concurrent revision activation committed against the old allocations (`tests/test_db_postgres.py::test_variant_change_cannot_race_with_activation`; CI run `45652067417`: 1 failed, 10 passed). | Activation could succeed, then the variant edit could commit and invalidate the supposedly frozen allocation. The metric guard had the same serialization gap. | Resolved by locking the parent revision row in both write guards until commit; PostgreSQL 16 CI run `45652442606` passed both concurrency regressions (12/12 integration), migration (1) and baseline (65) |
 
 ## In-session adversarial review conclusions (2026-11-21)
 

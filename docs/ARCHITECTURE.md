@@ -5,6 +5,10 @@ Phase 2 is an importable Python modular core:
 `models -> assignment -> event inputs -> analysis -> report/CLI`
 
 The core has no HTTP, database, frontend or model-provider dependency.
+M1 introduces a separate `experimentlift.db` SQLAlchemy/Psycopg boundary:
+relational models and idempotent transaction helpers do not import the
+statistical core. It is not an HTTP service or an authorization layer. PostgreSQL
+16 CI is required to establish whether its migration and triggers work.
 `AssignmentStore` preserves the first allocation only in memory. Analysis
 consumes frozen Pydantic configuration with a SHA-256 configuration hash.
 
