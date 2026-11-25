@@ -30,6 +30,9 @@ NOTHING` on named unique constraints and then compare persisted data; conflictin
 replays raise explicit errors. Callers own the enclosing transaction and its
 rollback. Unique constraints serialize competing writes. Assignment scope is
 experiment-wide (not revision-wide) to preserve the first arm across edits.
+Variant and metric write guards lock their parent revision row (`FOR UPDATE`)
+until commit, serializing draft edits against activation so allocations and
+metric definitions cannot change after an activation checked them.
 Event source is additional provenance; the Phase 2 `OutcomeEvent` has no source
 field, so a future adapter must supply one. Results require explicit version and
 data-source fields; they do not recompute statistics.

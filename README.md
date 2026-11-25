@@ -1,17 +1,20 @@
 # ExperimentLift
 
-Evidence-first marketing experimentation. This repository currently contains
-**Phase 0–2 only**: a local, synthetic-data Python vertical slice for a
-fixed-horizon two-arm email-conversion experiment.
+Evidence-first marketing experimentation. The runnable Phase 0–2 slice uses
+local synthetic data for a fixed-horizon two-arm email-conversion experiment.
+The M1 branch also contains a PostgreSQL 16 persistence foundation; no
+application API or authenticated service is implemented.
 
 It does **not** send email, connect to marketing platforms, retain customer
 data, call an AI provider, expose an API, provide authentication, or make
 business claims from synthetic output.
 
-M1 PostgreSQL schema, migration and transaction helpers are under development
-on a feature branch. They have not passed real PostgreSQL CI yet. They do not
-provide an authenticated API. Run migration tests only with an explicitly
-disposable PostgreSQL 16 database; `alembic downgrade base` destroys M1 data.
+M1 provides a PostgreSQL schema, frozen initial migration and transaction
+helpers on PR #3. Its migration and integration tests run against an ephemeral
+PostgreSQL 16 service in CI; see `docs/VERIFICATION_MATRIX.md` for exact run
+evidence and outstanding review gates. Run migration tests only with an
+explicitly disposable PostgreSQL 16 database: `alembic downgrade base`
+destroys M1 data.
 
 ## Install and run
 
@@ -34,7 +37,9 @@ assignment, separately modelled events, idempotency-key deduplication, SRM and
 missing-outcome gates, score/Fisher testing, Newcombe confidence intervals,
 seeded simulation checks, reports, tests.
 
-Planned: persistence, FastAPI, workspace authorization, AI creative review,
-frontend, email-provider integrations, and deployment.
+The M1 branch adds 12 workspace-scoped persistence tables, integrity guards
+and idempotent assignment/event helpers. Planned after M1 acceptance: FastAPI,
+workspace authorization, AI creative review, frontend, email-provider
+integrations, and deployment.
 
 See `docs/PROGRESS.md` for the authoritative status.

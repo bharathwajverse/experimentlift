@@ -7,10 +7,10 @@ post-merge CI run `44876504981` passing Python 3.11–3.14.
 
 **M1 PostgreSQL evidence is now demonstrated in CI.** Branch
 `feat/m1-postgresql-foundation` (PR #3) reaches SHA
-`c80b8c7aabeede00a26278341d9c29cd3f76d29d`; Actions run `44909032886`
+`110c323fad1a9e582d582b485c41911236e41f35`; Actions run `45652442606`
 completed `success` with 5/5 jobs green — `PostgreSQL 16 integration`,
 `Python 3.11`, `Python 3.12`, `Python 3.13`, `Python 3.14`. The PostgreSQL
-job reported `1 passed` (migration), `10 passed` (integration) and `65 passed`
+job reported `1 passed` (migration), `12 passed` (integration) and `65 passed`
 (statistical baseline), with no skips, confirming
 `EXPERIMENTLIFT_TEST_DATABASE_URL` was set and tests hit a real
 `postgres:16` service. Server logs show each immutability guard rejecting the
@@ -35,6 +35,12 @@ Repair history for M1 in this branch:
   and documented the flush-order contract in `models.py`; the probe then
   observed `workspaces`, `experiments`, `experiment_revisions`, `variants`.
   Production `store.py` paths use Core inserts and were unaffected.
+- `681c370` added a concurrent-activation reproducer. CI run `45652067417`
+  failed it (`1 failed, 10 passed`): activation committed against old variant
+  allocations while a variant edit was uncommitted.
+- `110c323` serialized variant and metric edits with activation by locking
+  the parent revision row. CI run `45652442606` passed both race regressions,
+  the migration round trip, and all statistical tests.
 
 Implemented: configuration validation, deterministic HMAC allocation with
 in-process first-assignment persistence, terminal outcomes, dedupe,
@@ -76,15 +82,15 @@ no Phase 3 code was written; see `DECISION_LOG.md` for the gate decision.
   lock policy), KI-021 (project license), KI-022 (branch protection), and
   external Phase 0–2 review unavailable.
 
-## M1 gate: evidence PASS, PR #3 pending merge (2026-11-21)
+## M1 gate: evidence PASS, PR #3 pending merge (2026-11-25)
 
 - Branch `feat/m1-postgresql-foundation`, SHA
-  `c80b8c7aabeede00a26278341d9c29cd3f76d29d`, PR #3 (draft).
-- Actions run `44909032886` concluded `success`; 5/5 jobs green:
-  `PostgreSQL 16 integration` (`136860687454`), `Python 3.11`, `3.12`, `3.13`,
+  `110c323fad1a9e582d582b485c41911236e41f35`, PR #3 (ready for review).
+- Actions run `45652442606` concluded `success`; 5/5 jobs green:
+  `PostgreSQL 16 integration` (`139340220768`), `Python 3.11`, `3.12`, `3.13`,
   `3.14`.
-- PostgreSQL job evidence: `1 passed in 2.85s` (migration upgrade/downgrade/
-  re-upgrade/drift), `10 passed in 1.37s` (integration), `65 passed in 5.67s`
+- PostgreSQL job evidence: `1 passed in 1.93s` (migration upgrade/downgrade/
+  re-upgrade/drift), `12 passed in 1.90s` (integration), `65 passed in 3.61s`
   (statistical baseline). No skips, so the real-database path executed.
 - Server-side log confirms each guard rejected the invalid write it exists to
   reject: `activated revision is immutable`, `activated revision variants are
@@ -93,6 +99,12 @@ no Phase 3 code was written; see `DECISION_LOG.md` for the gate decision.
   plus the FK and unique-constraint rejections.
 - Failed predecessor run `44887532959` at `95b310e` (`10 failed`,
   `fk_experiment_workspace`) is repaired by `c80b8c7` and recorded as KI-026.
+- Independent security-review agent found no critical/high findings; its
+  trigger-owner and destructive-downgrade caveats are documented in
+  `docs/DATABASE_SCHEMA.md`. The separate code-review agent failed to start
+  (provider usage limit); a distinct in-session adversarial diff review
+  found the concurrency bug and produced RED/GREEN CI evidence. This is
+  **not** represented as a successful second independent agent review.
 - Not yet claimed: M1 PASS. Merge of PR #3 and post-merge CI on `main` must be
   verified first, and local PostgreSQL remains unavailable (KI-010).
 
