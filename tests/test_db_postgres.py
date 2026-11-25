@@ -1,8 +1,10 @@
 """Database integration checks; CI provides a disposable PostgreSQL 16 database."""
 
 import os
+import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
+from threading import Event as ThreadEvent
 from uuid import uuid4
 
 import pytest
@@ -355,3 +357,42 @@ def test_experiment_identity_and_metric_contract_are_frozen(db):
         ))
         with pytest.raises(DBAPIError):
             session.commit()
+
+
+def test_variant_change_cannot_race_with_activation(db):
+    from sqlalchemy.exc import DBAPIError
+    from experimentlift.db.models import ExperimentRevision, Variant
+
+    engine, Session = db
+    with Session(engine) as setup:
+        wid, eid, rid, control, _ = _seed(setup)
+
+    started = ThreadEvent()
+
+    def activate():
+        with Session(engine) as session:
+            revision = session.get(ExperimentRevision, rid)
+            revision.state = "active"
+            started.set()
+            try:
+                session.commit()
+                return None
+            except DBAPIError as exc:
+                session.rollback()
+                return str(exc.orig)
+
+    with Session(engine) as editor:
+        variant = editor.get(Variant, control)
+        variant.allocation = 0.6
+        editor.flush()  # Keep the changed allocation uncommitted during activation.
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            future = pool.submit(activate)
+            assert started.wait(timeout=10)
+            try:
+                time.sleep(0.5)  # Allow activation to reach the DB while editor is open.
+                assert not future.done(), "activation must wait for the in-flight variant edit"
+            finally:
+                editor.commit()
+            assert "activation requires exactly two complete variant allocations" in future.result(timeout=10)
+    with Session(engine) as session:
+        assert session.get(ExperimentRevision, rid).state == "draft"
