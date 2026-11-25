@@ -226,7 +226,7 @@ def upgrade():
     op.execute("""
         CREATE FUNCTION experimentlift_variant_guard() RETURNS trigger
         LANGUAGE plpgsql AS $$
-        DECLARE target_workspace uuid; target_revision uuid;
+        DECLARE target_workspace uuid; target_revision uuid; revision_state text;
         BEGIN
             IF TG_OP = 'DELETE' THEN
                 target_workspace := OLD.workspace_id;
@@ -242,11 +242,12 @@ def upgrade():
             ) THEN
                 RAISE EXCEPTION 'variant identity is immutable';
             END IF;
-            IF EXISTS (
-                SELECT 1 FROM experiment_revisions
-                WHERE workspace_id = target_workspace AND id = target_revision
-                  AND state <> 'draft'
-            ) THEN
+            -- Serialize variant writes with activation's UPDATE of the parent.
+            -- The row lock is held until commit, not just until this trigger ends.
+            SELECT state INTO revision_state FROM experiment_revisions
+            WHERE workspace_id = target_workspace AND id = target_revision
+            FOR UPDATE;
+            IF revision_state IS NOT NULL AND revision_state <> 'draft' THEN
                 RAISE EXCEPTION 'activated revision variants are immutable';
             END IF;
             IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
@@ -282,7 +283,7 @@ def upgrade():
     op.execute("""
         CREATE FUNCTION experimentlift_metric_guard() RETURNS trigger
         LANGUAGE plpgsql AS $$
-        DECLARE target_workspace uuid; target_revision uuid;
+        DECLARE target_workspace uuid; target_revision uuid; revision_state text;
         BEGIN
             IF TG_OP = 'UPDATE' AND (
                 NEW.id <> OLD.id OR NEW.workspace_id <> OLD.workspace_id
@@ -297,11 +298,11 @@ def upgrade():
                 target_workspace := NEW.workspace_id;
                 target_revision := NEW.revision_id;
             END IF;
-            IF EXISTS (
-                SELECT 1 FROM experiment_revisions
-                WHERE workspace_id = target_workspace AND id = target_revision
-                  AND state <> 'draft'
-            ) THEN
+            -- Apply the same serialization to the metric contract.
+            SELECT state INTO revision_state FROM experiment_revisions
+            WHERE workspace_id = target_workspace AND id = target_revision
+            FOR UPDATE;
+            IF revision_state IS NOT NULL AND revision_state <> 'draft' THEN
                 RAISE EXCEPTION 'activated revision metrics are immutable';
             END IF;
             IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;

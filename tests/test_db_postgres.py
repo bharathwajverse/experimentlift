@@ -396,3 +396,43 @@ def test_variant_change_cannot_race_with_activation(db):
             assert "activation requires exactly two complete variant allocations" in future.result(timeout=10)
     with Session(engine) as session:
         assert session.get(ExperimentRevision, rid).state == "draft"
+
+
+def test_metric_edit_finishes_before_activation(db):
+    from sqlalchemy import select
+    from experimentlift.db.models import ExperimentRevision, Metric
+
+    engine, Session = db
+    with Session(engine) as setup:
+        wid, eid, rid, _, _ = _seed(setup)
+        setup.add(Metric(
+            workspace_id=wid, revision_id=rid, name="conversion",
+            definition={"kind": "binary"},
+        ))
+        setup.commit()
+
+    started = ThreadEvent()
+
+    def activate():
+        with Session(engine) as session:
+            revision = session.get(ExperimentRevision, rid)
+            revision.state = "active"
+            started.set()
+            session.commit()
+
+    with Session(engine) as editor:
+        metric = editor.scalar(select(Metric))
+        metric.definition = {"kind": "binary", "window": "7d"}
+        editor.flush()
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            future = pool.submit(activate)
+            assert started.wait(timeout=10)
+            try:
+                time.sleep(0.5)
+                assert not future.done(), "activation must wait for the in-flight metric edit"
+            finally:
+                editor.commit()
+            future.result(timeout=10)
+    with Session(engine) as session:
+        assert session.get(ExperimentRevision, rid).state == "active"
+        assert session.scalar(select(Metric)).definition == {"kind": "binary", "window": "7d"}
